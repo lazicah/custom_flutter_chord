@@ -57,6 +57,8 @@ class LyricsRenderer extends StatefulWidget {
 
   final double fixedChordSpace;
 
+  final ScrollController? scrollController;
+
   const LyricsRenderer(
       {super.key,
       required this.lyrics,
@@ -80,6 +82,7 @@ class LyricsRenderer extends StatefulWidget {
       this.trailingWidget,
       this.chordNotation = ChordNotation.american,
       this.chordPresentation,
+      this.scrollController,
       this.fixedChordSpace = 20.0});
 
   @override
@@ -106,7 +109,7 @@ class _LyricsRendererState extends State<LyricsRenderer> {
           fontStyle: FontStyle.italic,
           fontSize: widget.textStyle.fontSize! - 2,
         );
-    _controller = ScrollController();
+    _controller = widget.scrollController ?? ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // executes after build
       _scrollToEnd();
