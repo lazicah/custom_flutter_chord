@@ -211,80 +211,86 @@ class _LyricsRendererState extends State<LyricsRenderer> {
       transposeIncrement: widget.transposeIncrement,
     );
     if (chordLyricsDocument.chordLyricsLines.isEmpty) return Container();
-    return SingleChildScrollView(
-      controller: _controller,
-      physics: widget.scrollPhysics,
-      child: Column(
-        crossAxisAlignment: widget.horizontalAlignment,
-        children: [
-          if (widget.leadingWidget != null) widget.leadingWidget!,
-          if (chordLyricsDocument.capo != null)
-            Text('Capo: ${chordLyricsDocument.capo!}', style: capoStyle),
-          ListView.separated(
-            shrinkWrap: true,
-            scrollDirection: Axis.vertical,
-            physics: const NeverScrollableScrollPhysics(),
-            separatorBuilder: (context, index) => SizedBox(
-              height: widget.lineHeight,
-            ),
-            itemBuilder: (context, index) {
-              final ChordLyricsLine line =
-                  chordLyricsDocument.chordLyricsLines[index];
-              if (line.isStartOfChorus()) {
-                _isChorus = true;
-              }
-              if (line.isEndOfChorus()) {
-                _isChorus = false;
-              }
-              if (line.isComment()) {
-                _isComment = true;
-              } else {
-                _isComment = false;
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.showChord)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: line.chords
-                            .asMap()
-                            .entries
-                            .map((chord) => Row(
-                                  children: [
-                                    SizedBox(
-                                      width: !widget.showText
-                                          ? (chord.key == 0
-                                              ? 0
-                                              : widget.fixedChordSpace)
-                                          : chord.value.leadingSpace,
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => widget
-                                          .onTapChord(chord.value.chordText),
-                                      child: getFinalText(chord),
-                                    )
-                                  ],
-                                ))
-                            .toList(),
-                      ),
-                    ),
-                  if (widget.showText)
-                    RichText(
-                      text: TextSpan(
-                          text: line.lyrics, style: getLineTextStyle()),
-                      textScaler: TextScaler.linear(widget.scaleFactor),
-                    )
-                ],
-              );
-            },
-            itemCount: chordLyricsDocument.chordLyricsLines.length,
+    Widget child = Column(
+      crossAxisAlignment: widget.horizontalAlignment,
+      children: [
+        if (widget.leadingWidget != null) widget.leadingWidget!,
+        if (chordLyricsDocument.capo != null)
+          Text('Capo: ${chordLyricsDocument.capo!}', style: capoStyle),
+        ListView.separated(
+          shrinkWrap: true,
+          scrollDirection: Axis.vertical,
+          physics: const NeverScrollableScrollPhysics(),
+          separatorBuilder: (context, index) => SizedBox(
+            height: widget.lineHeight,
           ),
-          if (widget.trailingWidget != null) widget.trailingWidget!,
-        ],
-      ),
+          itemBuilder: (context, index) {
+            final ChordLyricsLine line =
+                chordLyricsDocument.chordLyricsLines[index];
+            if (line.isStartOfChorus()) {
+              _isChorus = true;
+            }
+            if (line.isEndOfChorus()) {
+              _isChorus = false;
+            }
+            if (line.isComment()) {
+              _isComment = true;
+            } else {
+              _isComment = false;
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.showChord)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: line.chords
+                          .asMap()
+                          .entries
+                          .map((chord) => Row(
+                                children: [
+                                  SizedBox(
+                                    width: !widget.showText
+                                        ? (chord.key == 0
+                                            ? 0
+                                            : widget.fixedChordSpace)
+                                        : chord.value.leadingSpace,
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => widget
+                                        .onTapChord(chord.value.chordText),
+                                    child: getFinalText(chord),
+                                  )
+                                ],
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                if (widget.showText)
+                  RichText(
+                    text:
+                        TextSpan(text: line.lyrics, style: getLineTextStyle()),
+                    textScaler: TextScaler.linear(widget.scaleFactor),
+                  )
+              ],
+            );
+          },
+          itemCount: chordLyricsDocument.chordLyricsLines.length,
+        ),
+        if (widget.trailingWidget != null) widget.trailingWidget!,
+      ],
     );
+
+    if (widget.scrollController != null) {
+      return child;
+    } else {
+      return SingleChildScrollView(
+        controller: _controller,
+        physics: widget.scrollPhysics,
+        child: child,
+      );
+    }
   }
 
   @override
