@@ -6,15 +6,12 @@ import 'model/chord_lyrics_line.dart';
 import 'chord_transposer.dart';
 
 class ChordProcessor {
-  final BuildContext context;
-  final ChordNotation chordNotation;
-  final ChordTransposer chordTransposer;
-  final double media;
+  final double viewWidth;
   late double _textScaleFactor;
 
-  ChordProcessor(this.context, [this.chordNotation = ChordNotation.american])
-      : chordTransposer = ChordTransposer(chordNotation),
-        media = MediaQuery.of(context).size.width;
+  ChordProcessor(
+    this.viewWidth,
+  );
 
   /// Process the text to get the parsed ChordLyricsDocument
   ChordLyricsDocument processText({
@@ -24,12 +21,10 @@ class ChordProcessor {
     required TextStyle chorusStyle,
     double scaleFactor = 1.0,
     int widgetPadding = 0,
-    int transposeIncrement = 0,
   }) {
     final List<String> lines = text.split('\n');
     final MetadataHandler metadata = MetadataHandler();
     _textScaleFactor = scaleFactor;
-    chordTransposer.transpose = transposeIncrement;
 
     /// List to store our updated lines without overflows
     final List<String> newLines = <String>[];
@@ -45,7 +40,7 @@ class ChordProcessor {
       }
 
       //check if we have a long line
-      if (textWidth(currentLine, lyricsStyle) >= media) {
+      if (textWidth(currentLine, lyricsStyle) >= viewWidth) {
         _handleLongLine(
             currentLine: currentLine,
             newLines: newLines,
@@ -101,7 +96,7 @@ class ChordProcessor {
         //It is intended to allow for padding in the widget when comparing it to screen width
         //An additional buffer of around 10 might be needed to definitely stop overflow (ie. padding + 10).
         if (textWidth(currentCharacters, lyricsStyle) + widgetPadding >=
-            media) {
+            viewWidth) {
           newLines.add(currentLine.substring(characterIndex, lastSpace).trim());
           currentCharacters = '';
           characterIndex = lastSpace;
@@ -116,7 +111,7 @@ class ChordProcessor {
   /// Return the textwidth of the text in the given style
   double textWidth(String text, TextStyle textStyle) {
     return (TextPainter(
-      textScaleFactor: _textScaleFactor,
+      textScaler: TextScaler.linear(_textScaleFactor),
       text: TextSpan(text: text, style: textStyle),
       maxLines: 1,
       textDirection: TextDirection.ltr,
@@ -139,9 +134,10 @@ class ChordProcessor {
     }
     line.split('').forEach((character) {
       if (character == ']') {
+        // lyricsSoFar = '$lyricsSoFar ';
         final sizeOfLeadingLyrics = isChorus
             ? textWidth(lyricsSoFar, chorusStyle)
-            : textWidth(lyricsSoFar, lyricsStyle);
+            : textWidth(lyricsSoFar, chordStyle);
 
         final lastChordText = chordLyricsLine.chords.isNotEmpty
             ? chordLyricsLine.chords.last.chordText
@@ -149,23 +145,31 @@ class ChordProcessor {
 
         final lastChordWidth = textWidth(lastChordText, chordStyle);
         // final sizeOfThisChord = textWidth(_chordsSoFar, chordStyle);
+        final chordSoFarWidth = textWidth(chordsSoFar, chordStyle) + (12);
 
-        double leadingSpace = max(0, sizeOfLeadingLyrics - lastChordWidth);
+        double leadingSpace = max(0, sizeOfLeadingLyrics * _textScaleFactor);
 
-        final transposedChord = chordTransposer.transposeChord(chordsSoFar);
+        final transposedChord = chordsSoFar;
 
         chordLyricsLine.chords.add(Chord(leadingSpace, transposedChord));
         chordLyricsLine.lyrics += lyricsSoFar;
+        chordLyricsLine.lyricsContent.add(WidgetSpan(
+            child: SizedBox(
+          width: chordSoFarWidth,
+        )));
         lyricsSoFar = '';
         chordsSoFar = '';
         chordHasStarted = false;
       } else if (character == '[') {
         chordHasStarted = true;
+        // lyricsSoFar = '$lyricsSoFar ';
       } else {
         if (chordHasStarted) {
           chordsSoFar += character;
+          // lyricsSoFar = '$lyricsSoFar ';
         } else {
           lyricsSoFar += character;
+          chordLyricsLine.lyricsContent.add(TextSpan(text: character));
         }
       }
     });

@@ -133,8 +133,6 @@ class _HomePageState extends State<HomePage> {
                 onTapChord: (String chord) {
                   print('pressed chord: $chord');
                 },
-                transposeIncrement: transposeIncrement,
-                scrollSpeed: scrollSpeed,
                 widgetPadding: 24,
                 lineHeight: 4,
                 showText: true,

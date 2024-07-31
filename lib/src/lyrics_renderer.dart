@@ -1,7 +1,8 @@
+import 'package:custom_flutter_chord/src/lyrics_controller.dart';
 import 'package:flutter/material.dart';
-import 'chord_transposer.dart';
 import 'model/chord_lyrics_line.dart';
-import 'chord_parser.dart';
+
+typedef ChordViewBuilder = Widget Function(Widget child);
 
 class LyricsRenderer extends StatefulWidget {
   final String lyrics;
@@ -13,15 +14,7 @@ class LyricsRenderer extends StatefulWidget {
   final Function onTapChord;
 
   /// To help stop overflow, this should be the sum of left & right padding
-  final int widgetPadding;
-
-  /// Transpose Increment for the Chords,
-  /// default value is 0, which means no transpose is applied
-  final int transposeIncrement;
-
-  /// Auto Scroll Speed,
-  /// default value is 0, which means no auto scroll is applied
-  final int scrollSpeed;
+  final double widgetPadding;
 
   /// Extra height between each line
   final double lineHeight;
@@ -37,9 +30,6 @@ class LyricsRenderer extends StatefulWidget {
 
   /// Scale factor of chords and lyrics
   final double scaleFactor;
-
-  /// Notation that will be handled by the transposer
-  final ChordNotation chordNotation;
 
   /// Define physics of scrolling
   final ScrollPhysics scrollPhysics;
@@ -57,7 +47,9 @@ class LyricsRenderer extends StatefulWidget {
 
   final double fixedChordSpace;
 
-  final ScrollController? scrollController;
+  final LyricsController? lyricsController;
+
+  final ChordViewBuilder? chordViewBuilder;
 
   const LyricsRenderer(
       {super.key,
@@ -73,16 +65,14 @@ class LyricsRenderer extends StatefulWidget {
       this.showText = true,
       this.minorScale = false,
       this.widgetPadding = 0,
-      this.transposeIncrement = 0,
-      this.scrollSpeed = 0,
       this.lineHeight = 8.0,
       this.horizontalAlignment = CrossAxisAlignment.center,
       this.scrollPhysics = const ClampingScrollPhysics(),
       this.leadingWidget,
       this.trailingWidget,
-      this.chordNotation = ChordNotation.american,
       this.chordPresentation,
-      this.scrollController,
+      this.lyricsController,
+      this.chordViewBuilder,
       this.fixedChordSpace = 20.0});
 
   @override
@@ -90,12 +80,14 @@ class LyricsRenderer extends StatefulWidget {
 }
 
 class _LyricsRendererState extends State<LyricsRenderer> {
-  late final ScrollController _controller;
+  late ScrollController _controller;
   late TextStyle chorusStyle;
   late TextStyle capoStyle;
   late TextStyle commentStyle;
   bool _isChorus = false;
   bool _isComment = false;
+
+  late LyricsController _lyricsController;
 
   @override
   void initState() {
@@ -109,10 +101,18 @@ class _LyricsRendererState extends State<LyricsRenderer> {
           fontStyle: FontStyle.italic,
           fontSize: widget.textStyle.fontSize! - 2,
         );
-    _controller = widget.scrollController ?? ScrollController();
+
+    _controller = ScrollController();
+    _lyricsController = widget.lyricsController ?? LyricsController();
+    _lyricsController.capoStyle = capoStyle;
+    _lyricsController.commentStyle = commentStyle;
+    _lyricsController.chorusStyle = chorusStyle;
+    _lyricsController.scaleFactor = widget.scaleFactor;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // executes after build
-      _scrollToEnd();
+      _lyricsController.viewWidth = 1000;
+      _lyricsController.init(lyrics: widget.lyrics);
     });
   }
 
@@ -132,194 +132,176 @@ class _LyricsRendererState extends State<LyricsRenderer> {
     }
   }
 
-  String replaceChord(String chord) {
-    String currentChord = chord;
-    switch (widget.chordNotation) {
-      case ChordNotation.american:
-        int i = 0;
-        for (var c in americanNotes) {
-          if (chord.contains(c)) {
-            currentChord =
-                chord.replaceAll(RegExp(c), widget.chordPresentation![i]);
-            break;
-          }
-          i += 1;
-        }
-        break;
-      default:
-        int i = 0;
-        for (var c in italianNotes) {
-          if (chord.contains(c)) {
-            currentChord =
-                chord.replaceAll(RegExp(c), widget.chordPresentation![i]);
-            break;
-          }
-          i += 1;
-        }
-        break;
-    }
+  // String replaceChord(String chord) {
+  //   String currentChord = chord;
+  //   switch (widget.chordNotation) {
+  //     case ChordNotation.american:
+  //       int i = 0;
+  //       for (var c in americanNotes) {
+  //         if (chord.contains(c)) {
+  //           currentChord =
+  //               chord.replaceAll(RegExp(c), widget.chordPresentation![i]);
+  //           break;
+  //         }
+  //         i += 1;
+  //       }
+  //       break;
+  //     default:
+  //       int i = 0;
+  //       for (var c in italianNotes) {
+  //         if (chord.contains(c)) {
+  //           currentChord =
+  //               chord.replaceAll(RegExp(c), widget.chordPresentation![i]);
+  //           break;
+  //         }
+  //         i += 1;
+  //       }
+  //       break;
+  //   }
 
-    return currentChord;
-  }
+  //   return currentChord;
+  // }
 
-  String transposeToMinor(String chord) {
-    String currentChord = chord;
+  // String transposeToMinor(String chord) {
+  //   String currentChord = chord;
 
-    // transpose chords into minor natural scale based on 5th circle
-    if (widget.minorScale && !chord.contains('m')) {
-      for (var c in minorScale.entries) {
-        if (chord.contains(c.key)) {
-          currentChord = chord.replaceAll(RegExp(c.key), c.value);
-        }
-      }
-    }
+  //   // transpose chords into minor natural scale based on 5th circle
+  //   if (widget.minorScale && !chord.contains('m')) {
+  //     for (var c in minorScale.entries) {
+  //       if (chord.contains(c.key)) {
+  //         currentChord = chord.replaceAll(RegExp(c.key), c.value);
+  //       }
+  //     }
+  //   }
 
-    return currentChord;
-  }
+  //   return currentChord;
+  // }
 
   Widget getFinalText(MapEntry<int, Chord> chord) {
-    if (widget.minorScale) {
-      return RichText(
-        text: TextSpan(
-            text: transposeToMinor(chord.value.chordText),
-            style: widget.chordStyle),
-        textScaler: TextScaler.linear(widget.scaleFactor),
-      );
-    }
+    // if (widget.minorScale) {
+    //   return RichText(
+    //     text: TextSpan(
+    //         text: transposeToMinor(chord.value.chordText),
+    //         style: widget.chordStyle),
+    //     textScaler: TextScaler.linear(widget.scaleFactor),
+    //   );
+    // }
     return RichText(
       text: TextSpan(
-        text: widget.chordPresentation != null
-            ? replaceChord(chord.value.chordText)
-            : chord.value.chordText,
+        text: chord.value.chordText,
         style: widget.chordStyle,
       ),
-      textScaler: TextScaler.linear(widget.scaleFactor),
+      textScaler: TextScaler.linear(_lyricsController.scaleFactor),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    ChordProcessor chordProcessor =
-        ChordProcessor(context, widget.chordNotation);
-    final chordLyricsDocument = chordProcessor.processText(
-      text: widget.lyrics,
-      lyricsStyle: widget.textStyle,
-      chordStyle: widget.chordStyle,
-      chorusStyle: chorusStyle,
-      widgetPadding: widget.widgetPadding,
-      scaleFactor: widget.scaleFactor,
-      transposeIncrement: widget.transposeIncrement,
-    );
-    if (chordLyricsDocument.chordLyricsLines.isEmpty) return Container();
-    Widget child = Column(
-      crossAxisAlignment: widget.horizontalAlignment,
-      children: [
-        if (widget.leadingWidget != null) widget.leadingWidget!,
-        if (chordLyricsDocument.capo != null)
-          Text('Capo: ${chordLyricsDocument.capo!}', style: capoStyle),
-        ListView.separated(
-          shrinkWrap: true,
-          scrollDirection: Axis.vertical,
-          physics: const NeverScrollableScrollPhysics(),
-          separatorBuilder: (context, index) => SizedBox(
-            height: widget.lineHeight,
-          ),
-          itemBuilder: (context, index) {
-            final ChordLyricsLine line =
-                chordLyricsDocument.chordLyricsLines[index];
-            if (line.isStartOfChorus()) {
-              _isChorus = true;
-            }
-            if (line.isEndOfChorus()) {
-              _isChorus = false;
-            }
-            if (line.isComment()) {
-              _isComment = true;
-            } else {
-              _isComment = false;
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.showChord)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: line.chords
-                          .asMap()
-                          .entries
-                          .map((chord) => Row(
-                                children: [
-                                  SizedBox(
-                                    width: !widget.showText
-                                        ? (chord.key == 0
-                                            ? 0
-                                            : widget.fixedChordSpace)
-                                        : chord.value.leadingSpace,
-                                  ),
-                                  GestureDetector(
-                                    onTap: () => widget
-                                        .onTapChord(chord.value.chordText),
-                                    child: getFinalText(chord),
-                                  )
-                                ],
-                              ))
-                          .toList(),
-                    ),
+    return AnimatedBuilder(
+      animation: _lyricsController,
+      builder: (context, _) {
+        final chordLyricsDocument = _lyricsController.chordLyricsDocument;
+        if (chordLyricsDocument == null ||
+            chordLyricsDocument.chordLyricsLines.isEmpty) return Container();
+        Widget child = SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Column(
+            crossAxisAlignment: widget.horizontalAlignment,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.leadingWidget != null) widget.leadingWidget!,
+              if (chordLyricsDocument.capo != null)
+                Text('Capo: ${chordLyricsDocument.capo!}', style: capoStyle),
+              SizedBox(
+                width: 1000,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(16),
+                  physics: const NeverScrollableScrollPhysics(),
+                  separatorBuilder: (context, index) => SizedBox(
+                    height: widget.lineHeight,
                   ),
-                if (widget.showText)
-                  RichText(
-                    text:
-                        TextSpan(text: line.lyrics, style: getLineTextStyle()),
-                    textScaler: TextScaler.linear(widget.scaleFactor),
-                  )
-              ],
-            );
-          },
-          itemCount: chordLyricsDocument.chordLyricsLines.length,
-        ),
-        if (widget.trailingWidget != null) widget.trailingWidget!,
-      ],
-    );
+                  itemBuilder: (context, index) {
+                    final ChordLyricsLine line =
+                        chordLyricsDocument.chordLyricsLines[index];
+                    if (line.isStartOfChorus()) {
+                      _isChorus = true;
+                    }
+                    if (line.isEndOfChorus()) {
+                      _isChorus = false;
+                    }
+                    if (line.isComment()) {
+                      _isComment = true;
+                    } else {
+                      _isComment = false;
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.showChord)
+                          Row(
+                            children: line.chords
+                                .asMap()
+                                .entries
+                                .map((chord) => Row(
+                                      children: [
+                                        SizedBox(
+                                          width: !widget.showText
+                                              ? (chord.key == 0
+                                                  ? 0
+                                                  : widget.fixedChordSpace)
+                                              : chord.value.leadingSpace,
+                                        ),
+                                        GestureDetector(
+                                          onTap: () => widget.onTapChord(
+                                              chord.value.chordText),
+                                          child: widget.chordViewBuilder
+                                                  ?.call(getFinalText(chord)) ??
+                                              getFinalText(chord),
+                                        )
+                                      ],
+                                    ))
+                                .toList(),
+                          ),
+                        // if (widget.showText)
+                        //   RichText(
+                        //     text: TextSpan(
+                        //         text: line.lyrics, style: getLineTextStyle()),
+                        //     textScaler: TextScaler.linear(widget.scaleFactor),
+                        //   )
+                        if (widget.showText)
+                          Text.rich(
+                            TextSpan(children: line.lyricsContent),
+                            style: getLineTextStyle(),
+                            textScaler: TextScaler.linear(
+                                _lyricsController.scaleFactor),
+                          )
+                      ],
+                    );
+                  },
+                  itemCount: chordLyricsDocument.chordLyricsLines.length,
+                ),
+              ),
+              if (widget.trailingWidget != null) widget.trailingWidget!,
+            ],
+          ),
+        );
 
-    if (widget.scrollController != null) {
-      return child;
-    } else {
-      return SingleChildScrollView(
-        controller: _controller,
-        physics: widget.scrollPhysics,
-        child: child,
-      );
-    }
+        return SingleChildScrollView(
+          controller: _lyricsController.controller,
+          physics: widget.scrollPhysics,
+          child: child,
+        );
+      },
+    );
   }
 
   @override
   void didUpdateWidget(covariant LyricsRenderer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.scrollSpeed != widget.scrollSpeed) {
-      _scrollToEnd();
-    }
-  }
-
-  void _scrollToEnd() {
-    if (widget.scrollSpeed <= 0) {
-      // stop scrolling if the speed is 0 or less
-      _controller.jumpTo(_controller.offset);
-      return;
-    }
-
-    if (_controller.offset >= _controller.position.maxScrollExtent) return;
-
-    final seconds =
-        (_controller.position.maxScrollExtent / (widget.scrollSpeed)).floor();
-
-    _controller.animateTo(
-      _controller.position.maxScrollExtent,
-      duration: Duration(
-        seconds: seconds,
-      ),
-      curve: Curves.linear,
-    );
+    // if (oldWidget.scrollSpeed != widget.scrollSpeed) {
+    //   _scrollToEnd();
+    // }
   }
 }
 

@@ -1,12 +1,16 @@
+import 'package:flutter/material.dart';
+
 class ChordLyricsLine {
   List<Chord> chords;
   String lyrics;
+  List<InlineSpan> lyricsContent;
 
   ChordLyricsLine()
       : chords = [],
-        lyrics = '';
+        lyrics = '',
+        lyricsContent = [];
 
-  ChordLyricsLine.line(this.chords, this.lyrics);
+  ChordLyricsLine.line(this.chords, this.lyrics, this.lyricsContent);
 
   /// Remove also the keyword
   bool isStartOfChorus() {
@@ -16,7 +20,7 @@ class ChordLyricsLine {
         lyrics.contains(startOfChorusAbbreviation);
     if (out) {
       lyrics = lyrics.replaceAll(startOfChorus, '');
-      lyrics = lyrics.replaceAll(startOfChorusAbbreviation, '').trim();
+      lyrics = lyrics.replaceAll(startOfChorusAbbreviation, '');
     }
     return out;
   }
@@ -29,7 +33,7 @@ class ChordLyricsLine {
         lyrics.contains(endOfChorusAbbreviation);
     if (out) {
       lyrics = lyrics.replaceAll(endOfChorus, '');
-      lyrics = lyrics.replaceAll(endOfChorusAbbreviation, '').trim();
+      lyrics = lyrics.replaceAll(endOfChorusAbbreviation, '');
     }
     return out;
   }
@@ -40,7 +44,7 @@ class ChordLyricsLine {
     bool out = lyrics.contains(comment);
     if (out) {
       lyrics = lyrics.replaceAll(comment, '');
-      lyrics = lyrics.replaceAll('}', '').trim();
+      lyrics = lyrics.replaceAll('}', '');
     }
     return out;
   }
